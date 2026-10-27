@@ -25,13 +25,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Configurar Entorno Xcode y Metal Toolchain
-        run: |
-          sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer || sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          XCODE_PATH=$(xcode-select -p)
-          echo "DEVELOPER_DIR=$XCODE_PATH" >> $GITHUB_ENV
-          xcrun -sdk iphoneos --show-sdk-path
-
       - name: Instalar dependencias del sistema (Homebrew)
         run: |
           brew install xcodegen zstd spirv-cross glslang
@@ -41,6 +34,19 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip
           python3 -m pip install lz4 capstone fonttools "backports.zstd; python_version < '3.14'" nsz gdown
+
+      - name: Parchear Launcher.swift para compatibilidad de Swift/iOS
+        run: |
+          sed -i '' 's/\.glassProminent/\.regular/g' dm/ios/Sources/Launcher.swift || true
+          sed -i '' 's/glassProminent/regular/g' dm/ios/Sources/Launcher.swift || true
+
+      - name: Restaurar Caché de Shaders y Compilaciones de Nxnative
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Games/MarioWonder/010015100B514000_build/shader
+            ~/Games/MarioWonder/010015100B514000_build/extract
+          key: mario-wonder-shaders-cache-v1
 
       - name: Crear carpeta de entrada y extraer prod.keys
         env:
