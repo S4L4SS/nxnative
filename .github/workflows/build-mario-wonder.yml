@@ -1,0 +1,63 @@
+name: Build Mario Wonder IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      game_file_id:
+        description: 'Google Drive File ID para el juego base'
+        required: true
+        default: '1n2_tHwQhQervLJAGpAkKB33TSsfwkWFJ'
+      update_file_id:
+        description: 'Google Drive File ID para el Update'
+        required: false
+        default: '16XKv4XVxHWBbqpsnUnCr5bYVGxiLWHxQ'
+
+jobs:
+  build-ipa:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias del sistema (Homebrew)
+        run: |
+          brew install xcodegen zstd spirv-cross glslang
+          brew install --cask dotnet-sdk
+
+      - name: Instalar paquetes de Python y gdown
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install lz4 capstone fonttools "backports.zstd; python_version < '3.14'" nsz gdown
+
+      - name: Crear carpeta de entrada y extraer prod.keys
+        env:
+          PROD_KEYS_CONTENT: ${{ secrets.PROD_KEYS }}
+        run: |
+          mkdir -p ~/Games/MarioWonder
+          mkdir -p ~/Keys
+          echo "$PROD_KEYS_CONTENT" > ~/Keys/prod.keys
+
+      - name: Descargar Juego Base desde Google Drive
+        run: |
+          gdown https://drive.google.com/uc?id=${{ github.event.inputs.game_file_id }} -O ~/Games/MarioWonder/base.nsp
+
+      - name: Descargar Update desde Google Drive
+        if: ${{ github.event.inputs.update_file_id != '' }}
+        run: |
+          gdown https://drive.google.com/uc?id=${{ github.event.inputs.update_file_id }} -O ~/Games/MarioWonder/update.nsp
+
+      - name: Recompilar y generar IPA con nxnative
+        run: |
+          python3 scripts/build_ipa_from_nsp.py ~/Games/MarioWonder -k ~/Keys/prod.keys
+
+      - name: Subir IPA generado a Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mario-Wonder-IPA
+          path: ~/Games/MarioWonder/*.ipa
